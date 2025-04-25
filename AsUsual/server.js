@@ -10,10 +10,12 @@ const randomstring = require('randomstring')
 const cloudinary = require('cloudinary').v2;
 const nodemailer = require('nodemailer');
 const session = require('express-session');
+const flash = require('connect-flash');
 const dotenv = require('dotenv');
 const crypto = require('crypto');
 const MongoStore = require('connect-mongo');
 const { uploads } = require('./config/cloudinary');
+const methodOverride = require('method-override');
 
 require('dotenv').config();     
 
@@ -48,10 +50,13 @@ const attachUser = async (req, res, next) => {
 };
 
 // Middleware
+
+
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static('public'));
 app.use(cookieParser());
+app.use(methodOverride('_method'));
 app.use(session({
     secret: process.env.SESSION_SECRET || 'Preaveen@8233',
     resave: false,
@@ -61,7 +66,14 @@ app.use(session({
 }));
 app.use(express.json()); // For JSON bodies
 app.use(express.urlencoded({ extended: true })); // For form data
+app.use(flash());
 
+// Make flash messages available to all views
+app.use((req, res, next) => {
+  res.locals.success = req.flash('success');
+  res.locals.error = req.flash('error');
+  next();
+});
 app.use(attachUser);
 const otpCache = {};
 
@@ -699,13 +711,31 @@ app.get('/signup', (req, res) => {
 // Handle user signup and account creation
 
 // Route to generate and send OTP
-app.post('/generate-otp', (req, res) => {
+
+
+app.post('/generate-otp', async (req, res) => {
     const { email } = req.body;
-    const otp = generateOTP();
-    otpCache[email] = otp; // Store OTP in cache
-    sendOTP(email, otp);
-    res.json({ success: true, message: 'OTP sent successfully' });
+
+    try {
+        // Check if user already exists in the database
+        const existingUser = await User.findOne({ email });
+
+        if (existingUser) {
+            return res.send({ success: false, message: 'Email already exists. Please check the database.' });
+        }
+
+        const otp = generateOTP();
+        otpCache[email] = otp; // Store OTP in cache
+        sendOTP(email, otp);
+
+        res.json({ success: true, message: 'OTP sent successfully' });
+
+    } catch (error) {
+        console.error('Error checking user:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
 });
+
 // Route to verify OTP
 app.post('/verify-otp', (req, res) => {
     const { email, otp } = req.body;
@@ -760,13 +790,24 @@ app.post('/user/login', async (req, res) => {
 
         if (!user) {
             req.session.loginError = 'Invalid email or password';
-            return res.redirect('/signup');
+            return res.send(`
+                <script>
+                  alert('wrong email or password');
+                  window.location.href = '/signup';
+                </script>
+            `);
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             req.session.loginError = 'Invalid email or password';
-            return res.redirect('/signup');
+            return res.send(`
+                <script>
+                  alert('wrong email or password');
+                  window.location.href = '/signup';
+                </script>
+            `);
+     
         }
 
         // Create JWT token
@@ -1179,16 +1220,40 @@ app.post('/api/save-design', async (req, res) => {
 // View all orders (EJS)
 // Get all orders for the current user
 // Get all orders (without user filtering)
+// GET: All Orders for Admin
 app.get('/orders', async (req, res) => {
     try {
         const orders = await Order.find()
-            .populate('items.product', 'name images price')
-            .sort({ createdAt: -1 });
+            .populate({
+                path: 'items.product',
+                select: 'name images price',
+                // Add this to prevent null products from breaking the query
+                options: { allowNull: true }
+            })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // Optional: Sanitize data before passing to view
+        orders.forEach(order => {
+            order.items = order.items.map(item => {
+                if (!item.product) {
+                    // Add minimal product structure if null
+                    item.product = {
+                        name: 'Product not available',
+                        images: []
+                    };
+                }
+                return item;
+            });
+        });
 
         res.render('order', { orders });
     } catch (error) {
-        console.error('Error fetching orders:', error);
-        res.status(500).render('error', { message: 'Server error fetching orders' });
+        console.error('Order fetch error:', error);
+        res.status(500).render('error', {
+            message: 'Failed to load orders',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
     }
 });
 
@@ -1269,9 +1334,26 @@ app.post('/contact', async (req, res) => {
         // Save to DB
         const contact = new Contact({ name, email, message });
         await contact.save();
+        return res.sendFile(`<script>
+            alert('Thank you for your approach, we will get back to you shortly');
+              window.location.href = '/';
+            </script>`)
     } catch (error) {
         console.error('Error saving contact info:', error);
         res.status(500).send('An error occurred while submitting your message.');
+    }
+});
+
+// DELETE route for contact requests
+app.delete('/admin/contacts/:id', async (req, res) => {
+    try {
+        await Contact.findByIdAndDelete(req.params.id);
+        req.flash('success', 'Contact request deleted successfully');
+        res.redirect('/admin/contacts');
+    } catch (err) {
+        console.error('Error deleting contact:', err);
+        req.flash('error', 'Failed to delete contact request');
+        res.redirect('/admin/contacts');
     }
 });
 

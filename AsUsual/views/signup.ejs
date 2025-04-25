@@ -25,7 +25,7 @@
     <div class="As-container">
       <ul class="As-nav-links">
         <li>
-          <a href="#"><i class="fas fa-home"></i> <span>Home</span></a>
+          <a href="*/><i class="fas fa-home"></i> <span>Home</span></a>
         </li>
         <li>
           <a href="/about"
@@ -44,61 +44,14 @@
         </li>
       </ul>
       <div class="As-logo">
-        <a href="#"
+        <a href="/"
           ><img
             src="assests/horizontalLogo-removebg-preview.png"
             alt="Logo"
         /></a>
       </div>
       <div class="AS-nav-btn">
-        <% if (user) { %>
-        <li>
-          <a href="/cart"
-            ><i class="fas fa-shopping-cart"></i> <span>Cart</span></a
-          >
-        </li>
-        <li>
-          <a href="/all-orders"
-            ><i class="fa fa-shirt"></i><span>Your Orders</span></a
-          >
-        </li>
-        <!-- Dropdown for logged-in users -->
-        <!-- Profile Dropdown -->
-        <div class="profile-dropdown">
-          <div class="profile-trigger">
-            <li>
-              <a href="#"
-                ><i class="fas fa-user-circle"></i><span>Profile</span></a
-              >
-            </li>
-          </div>
-          <div class="profile-details">
-            <p><i class="fas fa-user"></i> Name: <%= user.name %></p>
-            <p><i class="fas fa-envelope"></i> Email: <%= user.email %></p>
-            <p>
-              <i class="fas fa-phone"></i> Phone: <%= user.phone || 'N/A' %>
-            </p>
-            <p>
-              <i class="fas fa-calendar"></i> Member Since: <%=
-              user.createdAt ? new Date(user.createdAt).toDateString() :
-              'N/A' %>
-            </p>
-          </div>
-        </div>
-        <li>
-          <a href="/logout"
-            ><i class="fas fa-sign-out-alt"></i><span>Logout</span>
-          </a>
-        </li>
-
-        <% } else { %>
-        <!-- Sign-up link for guests -->
-        <li>
-          <a href="/signup"
-            ><i class="fas fa-user-plus"></i> <span>Sign-Up</span></a
-          >
-        </li>
-        <% } %>
+        <!-- Sign-up link for all users -->
       </div>
 
       <div class="As-hamburger">
@@ -267,7 +220,7 @@
             document.getElementById(verifyButtonId).style.display = 'block';
             alert('OTP sent to your email!');
           } else {
-            alert('Failed to send OTP.');
+            alert('Failed to send OTP. Maybe user already exists');
           }
         })
         .catch(error => {

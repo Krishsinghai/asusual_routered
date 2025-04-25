@@ -160,24 +160,32 @@
                         </div>
 
                         <div class="order-items p-5">
-                            <h4 class="font-medium mb-4 text-lg border-b border-dark-700 pb-2">Items</h4>
-                            <div class="space-y-4">
-                                <% order.items.forEach(item => { %>
-                                    <div class="order-item flex gap-4 p-3 bg-dark-700 rounded-lg">
-                                        <img src="<%= item.product.images[0] %>" alt="<%= item.product.name %>" class="w-16 h-16 object-cover rounded-md" />
-                                        <div class="item-details flex-1">
-                                            <p class="font-bold"><%= item.product.name %></p>
-                                            <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2 text-sm">
-                                                <p><span class="text-gray-400">Size:</span> <%= item.size %></p>
-                                                <p><span class="text-gray-400">Qty:</span> <%= item.quantity %></p>
-                                                <p><span class="text-gray-400">Price:</span> ₹<%= item.priceAtPurchase.toFixed(2) %></p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                <% }) %>
-                            </div>
-                        </div>
-
+                          <h4 class="font-medium mb-4 text-lg border-b border-dark-700 pb-2">Items</h4>
+                          <div class="space-y-4">
+                              <% order.items.forEach(item => { %>
+                                  <div class="order-item flex gap-4 p-3 bg-dark-700 rounded-lg">
+                                      <% if (item.product) { %>
+                                          <img src="<%= item.product.images[0] %>" alt="<%= item.product.name %>" class="w-16 h-16 object-cover rounded-md" />
+                                      <% } else { %>
+                                          <div class="w-16 h-16 bg-dark-600 rounded-md flex items-center justify-center">
+                                              <i class="fas fa-box-open text-gray-500"></i>
+                                          </div>
+                                      <% } %>
+                                      <div class="item-details flex-1">
+                                          <p class="font-bold">
+                                              <%= item.product ? item.product.name : 'Item not found' %>
+                                          </p>
+                                          <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2 text-sm">
+                                              <p><span class="text-gray-400">Size:</span> <%= item.size %></p>
+                                              <p><span class="text-gray-400">Qty:</span> <%= item.quantity %></p>
+                                              <p><span class="text-gray-400">Price:</span> ₹<%= item.priceAtPurchase.toFixed(2) %></p>
+                                          </div>
+                                      </div>
+                                  </div>
+                              <% }) %>
+                          </div>
+                      </div>
+                      
                         <div class="p-5 border-t border-dark-700 flex justify-end">
                             <a href="/user-orders/<%= order._id %>" class="bg-dark-700 hover:bg-dark-600 text-red-primary font-medium py-2 px-6 rounded-md transition border border-dark-600 hover:border-red-primary">
                                 View Details
