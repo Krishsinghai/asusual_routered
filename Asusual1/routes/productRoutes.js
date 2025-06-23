@@ -2,19 +2,19 @@ const express = require("express");
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
-  const Product = require("../models/Product");
-  const User = require("../models/UserSchema");
-  const Cart = require("../models/CartSchema");
-  const Admin = require("../models/AdminSchema");
-  const CustomTshirt = require("../models/CustomTshirtSchema");
-  const Poster = require("../models/posterSchema");
-  const Order = require("../models/OrderSchema");
-  const Contact = require("../models/Contact");
-  const Notification = require("../models/Notification");
-  const Subscription = require("../models/subscription");
-  const Testimonial = require("../models/Testimonial");
-  const DeliveryCost = require("../models/Deliveryschema");
-  const Coupon = require("../models/CouponSchema");
+const Product = require("../models/Product");
+const User = require("../models/UserSchema");
+const Cart = require("../models/CartSchema");
+const Admin = require("../models/AdminSchema");
+const CustomTshirt = require("../models/CustomTshirtSchema");
+const Poster = require("../models/posterSchema");
+const Order = require("../models/OrderSchema");
+const Contact = require("../models/Contact");
+const Notification = require("../models/Notification");
+const Subscription = require("../models/subscription");
+const Testimonial = require("../models/Testimonial");
+const DeliveryCost = require("../models/Deliveryschema");
+const Coupon = require("../models/CouponSchema");
 // Middleware
 
 // Use memory storage (recommended for Cloudinary)
@@ -99,9 +99,9 @@ router.post(
       // Validate required fields
       const { name, description, price, brand, bestseller, color, category } = req.body;
       if (!name || !description || !price || !category) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
-          message: "Missing required fields" 
+          message: "Missing required fields"
         });
       }
 
@@ -166,7 +166,7 @@ router.post(
 
       await product.save();
 
-       // Check if the request wants JSON response
+      // Check if the request wants JSON response
       if (req.headers.accept?.includes('application/json')) {
         return res.json({
           success: true,
@@ -193,42 +193,43 @@ router.post(
 );
 
 
-router.get("/:id", async (req, res) => {
-  try {
-    const productId = req.params.id;
-    const product = await Product.findById(productId);
+// router.get("/:id", async (req, res) => {
+//   try {
+//     const productId = req.params.id;
+//     const product = await Product.findById(productId);
 
-    if (!product) {
-      return res.status(404).send("Product not found");
-    }
+//     if (!product) {
+//       return res.status(404).send("Product not found");
+//     }
 
-    const userId = req.session.userId || req.cookies.userId;
-    let user = { name: "Guest" };
-    let cartCount = 0; // Initialize cart count
+//     const userId = req.session.userId || req.cookies.userId;
+//     let user = { name: "Guest" };
+//     let cartCount = 0; // Initialize cart count
 
-    if (userId) {
-      user = await User.findById(userId, "name _id email phone createdAt");
-      
-      // Fetch cart count if user is logged in
-      const cart = await Cart.findOne({ userId });
-      if (cart) {
-        cartCount = cart.items.reduce((total, item) => total + item.quantity, 0);
-      }
-    }
+//     if (userId) {
+//       user = await User.findById(userId, "name _id email phone createdAt");
 
-    res.render("product_detail", {
-      product,
-      user,
-      productId: product._id,
-      cartCount // Pass cartCount to the template
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send("Server error");
-  }
-});
+//       // Fetch cart count if user is logged in
+//       const cart = await Cart.findOne({ userId });
+//       if (cart) {
+//         cartCount = cart.items.reduce((total, item) => total + item.quantity, 0);
+//       }
+//     }
+
+//     res.render("product_detail", {
+//       product,
+//       user,
+//       productId: product._id,
+//       cartCount // Pass cartCount to the template
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).send("Server error");
+//   }
+// });
 
 // All products
+
 router.get("/", async (req, res) => {
   try {
     const products = await Product.find().sort({ createdAt: "desc" }).lean();
@@ -271,6 +272,32 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Edit product form
+// GET route to display all products for editing
+router.get("/edit-product", checkAdminAuth, async (req, res) => {
+  try {
+    const products = await Product.find(
+      {},
+      "name price front_image category brand bestseller sizes description"
+    ).lean();
+
+    const updatedProducts = products.map(product => ({
+      ...product,
+      front_image: product.front_image || null
+    }));
+
+    res.render("edit_product", { products: updatedProducts });
+  } catch (error) {
+    console.error("Error loading edit products:", error);
+    res.status(500).send(`
+      <script>
+        alert('Failed to load products: ${error.message.replace(/'/g, "\\'")}');
+        window.location.href = '/admin/dashboard';
+      </script>
+    `);
+  }
+});
+
 // Product details
 
 router.get("/:id", async (req, res) => {
@@ -302,31 +329,7 @@ router.get("/:id", async (req, res) => {
     res.status(500).send("Server error");
   }
 });
-// Edit product form
-// GET route to display all products for editing
-router.get("/edit-product", checkAdminAuth, async (req, res) => {
-  try {
-    const products = await Product.find(
-      {},
-      "name price front_image category brand bestseller sizes description"
-    ).lean();
-    
-    const updatedProducts = products.map(product => ({
-      ...product,
-      front_image: product.front_image || null
-    }));
-    
-    res.render("edit_product", { products: updatedProducts });
-  } catch (error) {
-    console.error("Error loading edit products:", error);
-    res.status(500).send(`
-      <script>
-        alert('Failed to load products: ${error.message.replace(/'/g, "\\'")}');
-        window.location.href = '/admin/dashboard';
-      </script>
-    `);
-  }
-});
+
 
 // POST route to update a product
 router.post(
@@ -339,7 +342,7 @@ router.post(
   ]),
   async (req, res) => {
     const { id } = req.params;
-    
+
     try {
       // Validate product ID
       if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -385,7 +388,7 @@ router.post(
           const publicId = extractPublicIdFromUrl(oldUrl);
           if (publicId) await cloudinary.uploader.destroy(publicId);
         }
-        
+
         return await cloudinary.uploader.upload(
           `data:${file.mimetype};base64,${file.buffer.toString('base64')}`,
           {
@@ -418,9 +421,9 @@ router.post(
           const publicId = extractPublicIdFromUrl(imageUrl);
           if (publicId) await cloudinary.uploader.destroy(publicId);
         }
-        
+
         // Upload new images
-        const uploadPromises = req.files.images.map(file => 
+        const uploadPromises = req.files.images.map(file =>
           uploadImage(file, null)
         );
         const results = await Promise.all(uploadPromises);
@@ -447,8 +450,6 @@ router.post(
     }
   }
 );
-
-
 // Delete product
 router.post("/delete/:id", async (req, res) => {
   try {
