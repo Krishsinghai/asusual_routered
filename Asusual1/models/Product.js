@@ -3,6 +3,7 @@
     const productSchema = new mongoose.Schema({
         name: { type: String, required: true },
         description: { type: String, required: true },
+        MRP:{type: Number, required: true},
         price: { type: Number, required: true },
         color: { type: String, required: true},
         brand: { type: String, default: "AsUsual" },

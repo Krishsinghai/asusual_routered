@@ -4,6 +4,7 @@ const express = require("express");
 const router = express.Router({ mergeParams: true });
 const multer = require('multer');
 const path = require('path');
+const sharp = require('sharp');
   const Product = require("../models/Product");
   const User = require("../models/UserSchema");
   const Cart = require("../models/CartSchema");
@@ -45,7 +46,17 @@ const checkAdminAuth = async (req, res, next) => {
 
 const uploads = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit (adjust as needed)
+  limits: { 
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+    files: 1 // Limit to 1 file per upload
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept images only
+    if (!file.mimetype.match(/^image\/(jpeg|jpg|png|gif|webp)$/)) {
+      return cb(new Error('Only image files are allowed!'), false);
+    }
+    cb(null, true);
+  }
 });
 
 const cloudinary = require('cloudinary').v2;
@@ -98,7 +109,38 @@ router.get("/edit-poster", checkAdminAuth, async (req, res) => {
 
 router.post(
   "/edit-poster/:index",
-  uploads.single("posterImage"),
+  checkAdminAuth,
+  (req, res, next) => {
+    uploads.single("posterImage")(req, res, function(err) {
+      if (err instanceof multer.MulterError) {
+        // A Multer error occurred when uploading
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).send(`
+            <script>
+              alert('File size too large. Maximum allowed is 50MB');
+              window.location.href = '/posters/edit-poster';
+            </script>
+          `);
+        }
+        return res.status(400).send(`
+          <script>
+            alert('File upload error: ${err.message}');
+            window.location.href = '/posters/edit-poster';
+          </script>
+        `);
+      } else if (err) {
+        // An unknown error occurred
+        return res.status(500).send(`
+          <script>
+            alert('Error: ${err.message}');
+            window.location.href = '/posters/edit-poster';
+          </script>
+        `);
+      }
+      // Everything went fine
+      next();
+    });
+  },
   async (req, res) => {
     try {
       const index = parseInt(req.params.index);
@@ -122,95 +164,62 @@ router.post(
       };
 
       if (file) {
-        // Upload with quality optimization
-        // AFTER (preserve quality better)
-        const result = await cloudinary.uploader.upload(file.path, {
-          use_filename: true,
-          unique_filename: false,
-          resource_type: "image",
-        });
+        try {
+          // Compress image before uploading
+          const compressedBuffer = await sharp(file.buffer)
+            .resize(1920, 1080, {  // Adjust dimensions as needed
+              fit: 'inside',
+              withoutEnlargement: true
+            })
+            .jpeg({ quality: 80 })  // or .png({ quality: 80 })
+            .toBuffer();
 
-        update.image[index] = result.secure_url;
+          const dataUri = `data:${file.mimetype};base64,${compressedBuffer.toString('base64')}`;
+          
+          const result = await cloudinary.uploader.upload(dataUri, {
+            resource_type: "auto",
+            quality: "auto:good",  // Slightly lower quality for smaller files
+          });
+
+          update.image[index] = result.secure_url;
+        } catch (uploadError) {
+          console.error("Cloudinary upload error:", uploadError);
+          return res.status(500).send(`
+            <script>
+              alert('Failed to upload image. Please try a smaller file or different image.');
+              window.location.href = '/posters/edit-poster';
+            </script>
+          `);
+        }
       }
 
       if (Heading !== undefined) update.Heading[index] = Heading;
       if (Title !== undefined) update.Title[index] = Title;
 
-      poster = await Poster.findOneAndUpdate({}, update, {
+      await Poster.findOneAndUpdate({}, update, {
         upsert: true,
         new: true,
         setDefaultsOnInsert: true,
       });
 
       return res.send(`
-  <script>
-    alert('Poster updated successfully');
-    window.location.href = '/posters/edit-poster'; 
-  </script>
-`);
+        <script>
+          alert('Poster updated successfully');
+          window.location.href = '/posters/edit-poster';
+        </script>
+      `);
     } catch (error) {
       console.error("Error updating poster:", error);
-      return res.status(500).send("Error updating poster");
+      return res.status(500).send(`
+        <script>
+          alert('Error updating poster: ${error.message}');
+          window.location.href = '/posters/edit-poster';
+        </script>
+      `);
     }
   }
 );
 
-router.post(
-  "/edit-poster",
-  uploads.fields([
-    { name: "poster1", maxCount: 1 },
-    { name: "poster2", maxCount: 1 },
-    { name: "poster3", maxCount: 1 },
-  ]),
-  async (req, res) => {
-    try {
-      const files = req.files;
-      let poster = (await Poster.findOne({})) || {
-        image: ["", "", ""],
-        Heading: ["", "", ""],
-        Title: ["", "", ""],
-      };
-
-      // Create a copy of existing data
-      const update = {
-        image: [...poster.image],
-        Heading: [...poster.Heading],
-        Title: [...poster.Title],
-      };
-
-      // Update only the fields that were submitted
-      for (let i = 1; i <= 3; i++) {
-        const field = `poster${i}`;
-        if (files[field]) {
-          update.image[i - 1] = files[field][0].path;
-        }
-        if (req.body[`Heading${i}`]) {
-          update.Heading[i - 1] = req.body[`Heading${i}`];
-        }
-        if (req.body[`Title${i}`]) {
-          update.Title[i - 1] = req.body[`Title${i}`];
-        }
-      }
-
-      // Update or create the poster document
-      poster = await Poster.findOneAndUpdate({}, update, {
-        upsert: true,
-        new: true,
-        setDefaultsOnInsert: true,
-      });
-
-      // Change this in both POST routes
-return res.send(`
-  <script>
-    alert('Poster updated successfully');
-    window.location.href = '/posters/edit-poster';
-  </script>
-`);
-    } catch (error) {
-      console.error("Error updating poster:", error);
-      return res.status(500).send("Error updating posters");
-    }
-  }
-);
+// Remove the duplicate /edit-poster route (the one with uploads.fields())
 
 module.exports = router;
