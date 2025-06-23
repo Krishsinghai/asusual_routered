@@ -208,7 +208,7 @@
           <h1 style="margin-bottom: 17px;">
             <%= product.name %>
           </h1>
-          <p class="MRP">₹<%= product.MRP %></p>
+          <p class="MRP2">₹<%= product.MRP %></p>
             <p class="price">₹<%= product.price %>
             </p>
             <hr>
@@ -315,25 +315,39 @@
 
             <h2><label>Available sizes:</label></h2>
             <div class="size-options">
-              <% if (product.sizes && product.sizes.xsmall > 0) { %>
-                  <button class="size-button" data-size="XS">XS</button>
-              <% } %>
-              <% if (product.sizes && product.sizes.small > 0) { %>
-                  <button class="size-button" data-size="S">S</button>
-              <% } %>
-              <% if (product.sizes && product.sizes.medium > 0) { %>
-                  <button class="size-button" data-size="M">M</button>
-              <% } %>
-              <% if (product.sizes && product.sizes.large > 0) { %>
-                  <button class="size-button" data-size="L">L</button>
-              <% } %>
-              <% if (product.sizes && product.sizes.xlarge > 0) { %>
-                  <button class="size-button" data-size="XL">XL</button>
-              <% } %>
-              <% if (product.sizes && product.sizes.xxlarge > 0) { %>
-                  <button class="size-button" data-size="XXL">XXL</button>
-              <% } %>
-          </div>
+  <% const sizes = product.sizes || {}; %>
+  <% const isOutOfStock = 
+    (!sizes.xsmall || sizes.xsmall <= 0) &&
+    (!sizes.small || sizes.small <= 0) &&
+    (!sizes.medium || sizes.medium <= 0) &&
+    (!sizes.large || sizes.large <= 0) &&
+    (!sizes.xlarge || sizes.xlarge <= 0) &&
+    (!sizes.xxlarge || sizes.xxlarge <= 0); %>
+
+  <% if (isOutOfStock) { %>
+    <p class="out-of-stock">Sorry, the product is currently unavailable.</p>
+  <% } else { %>
+    <% if (sizes.xsmall > 0) { %>
+      <button class="size-button" data-size="XS">XS</button>
+    <% } %>
+    <% if (sizes.small > 0) { %>
+      <button class="size-button" data-size="S">S</button>
+    <% } %>
+    <% if (sizes.medium > 0) { %>
+      <button class="size-button" data-size="M">M</button>
+    <% } %>
+    <% if (sizes.large > 0) { %>
+      <button class="size-button" data-size="L">L</button>
+    <% } %>
+    <% if (sizes.xlarge > 0) { %>
+      <button class="size-button" data-size="XL">XL</button>
+    <% } %>
+    <% if (sizes.xxlarge > 0) { %>
+      <button class="size-button" data-size="XXL">XXL</button>
+    <% } %>
+  <% } %>
+</div>
+
 
 
             <hr>
