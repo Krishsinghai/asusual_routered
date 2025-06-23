@@ -1,5 +1,8 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const { Readable } = require('stream');
+const cloudinary = require('cloudinary').v2;
+const sharp = require('sharp');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
@@ -19,21 +22,24 @@ const Coupon = require("../models/CouponSchema");
 // Middleware
 
 // Use memory storage (recommended for Cloudinary)
+// Configure multer with increased file size limit
 const uploads = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit (adjust as needed)
+  limits: { 
+    fileSize: 50 * 1024 * 1024, // 50MB limit per file
+    files: 7 // Maximum 7 files (front, back, and up to 5 additional images)
+  }
 });
 
-const cloudinary = require('cloudinary').v2;
-
-// Cloudinary upload options (disable quality degradation)
+// Cloudinary configuration with chunked upload for large files
 const cloudinaryUploadOptions = {
-  resource_type: 'image',
-  quality_analysis: false, // Disable automatic quality adjustment
-  quality: '100', // Maximum quality (100%)
-  fetch_format: 'auto', // Let Cloudinary decide format (but keep quality high)
+  resource_type: 'auto',
+  quality_analysis: false,
+  quality: '100',
+  fetch_format: 'auto',
+  chunk_size: 50 * 1024 * 1024, // 50MB chunks
   transformation: [
-    { quality: 'auto:best' }, // Prioritize best quality
+    { quality: 'auto:best' },
   ],
 };
 
@@ -88,18 +94,19 @@ router.get("/add-product", checkAdminAuth, (req, res) => {
   res.render("add_product");
 });
 
+
 router.post(
   "/add-product",
   uploads.fields([
     { name: "front_images", maxCount: 1 },
     { name: "back_image", maxCount: 1 },
-    { name: "images", maxCount: 5 },
+    { name: "images", maxCount: 5 }, // Allow up to 5 additional images
   ]),
   async (req, res) => {
     try {
       // Validate required fields
-      const { name, description, price, brand, bestseller, color, category } = req.body;
-      if (!name || !description || !price || !category) {
+      const { name, description, MRP, price, brand, bestseller, color, category } = req.body;
+      if (!name || !description || !price ||!MRP|| !category) {
         return res.status(400).json({
           success: false,
           message: "Missing required fields"
@@ -124,17 +131,40 @@ router.post(
         xxlarge: parseInt(req.body.sizes?.xxlarge) || 0,
       };
 
-      // Cloudinary upload function
+      // Enhanced Cloudinary upload function with error handling
       const uploadToCloudinary = async (file) => {
-        return await cloudinary.uploader.upload(
-          `data:${file.mimetype};base64,${file.buffer.toString('base64')}`,
-          {
-            resource_type: "auto",
-            quality: "auto:best",
-            fetch_format: "auto"
-          }
-        );
-      };
+  try {
+    // Compress image if over 9MB
+    let optimizedBuffer = file.buffer;
+    if (file.size > 9 * 1024 * 1024) {
+      optimizedBuffer = await sharp(file.buffer)
+        .jpeg({ quality: 80 }) // or .png({ compressionLevel: 8 })
+        .toBuffer();
+    }
+
+    return await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: 'auto',
+          quality: 'auto:good', // Slightly reduced quality for large files
+          chunk_size: 20 * 1024 * 1024,
+        },
+        (error, result) => {
+          if (error) reject(new Error(`Upload failed: ${error.message}`));
+          else resolve(result);
+        }
+      );
+
+      const readableStream = new Readable();
+      readableStream.push(optimizedBuffer);
+      readableStream.push(null);
+      readableStream.pipe(uploadStream);
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    throw error;
+  }
+};
 
       // Upload front image
       const frontImageResult = await uploadToCloudinary(req.files["front_images"][0]);
@@ -144,10 +174,19 @@ router.post(
 
       // Upload additional images if they exist
       let additionalImagesResults = [];
-      if (req.files["images"]) {
+      if (req.files["images"] && req.files["images"].length > 0) {
         additionalImagesResults = await Promise.all(
-          req.files["images"].map(file => uploadToCloudinary(file))
+          req.files["images"].map(async (file) => {
+            try {
+              return await uploadToCloudinary(file);
+            } catch (error) {
+              console.error(`Failed to upload additional image: ${error.message}`);
+              return null;
+            }
+          })
         );
+        // Filter out any failed uploads
+        additionalImagesResults = additionalImagesResults.filter(img => img !== null);
       }
 
       // Create product
@@ -155,6 +194,7 @@ router.post(
         name,
         description,
         sizes,
+        MRP,
         price,
         brand,
         color,
@@ -167,19 +207,11 @@ router.post(
 
       await product.save();
 
-      // Check if the request wants JSON response
-      if (req.headers.accept?.includes('application/json')) {
-        return res.json({
-          success: true,
-          message: "Product added successfully",
-          productId: product._id
-        });
-      }
-
       return res.json({
         success: true,
         message: "Product added successfully",
-        productId: product._id
+        productId: product._id,
+        product: product // Optional: return the full product data
       });
 
     } catch (error) {
@@ -193,43 +225,6 @@ router.post(
   }
 );
 
-
-// router.get("/:id", async (req, res) => {
-//   try {
-//     const productId = req.params.id;
-//     const product = await Product.findById(productId);
-
-//     if (!product) {
-//       return res.status(404).send("Product not found");
-//     }
-
-//     const userId = req.session.userId || req.cookies.userId;
-//     let user = { name: "Guest" };
-//     let cartCount = 0; // Initialize cart count
-
-//     if (userId) {
-//       user = await User.findById(userId, "name _id email phone createdAt");
-
-//       // Fetch cart count if user is logged in
-//       const cart = await Cart.findOne({ userId });
-//       if (cart) {
-//         cartCount = cart.items.reduce((total, item) => total + item.quantity, 0);
-//       }
-//     }
-
-//     res.render("product_detail", {
-//       product,
-//       user,
-//       productId: product._id,
-//       cartCount // Pass cartCount to the template
-//     });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).send("Server error");
-//   }
-// });
-
-// All products
 
 router.get("/", async (req, res) => {
   try {
@@ -279,7 +274,7 @@ router.get("/edit-product", checkAdminAuth, async (req, res) => {
   try {
     const products = await Product.find(
       {},
-      "name price front_image category brand bestseller sizes description"
+      "name MRP price front_image category brand bestseller sizes description"
     ).lean();
 
     const updatedProducts = products.map(product => ({
@@ -369,6 +364,7 @@ router.post(
       const updateData = {
         name: req.body.name,
         description: req.body.description,
+        MRP: req.body.MRP,
         price: req.body.price,
         brand: req.body.brand,
         category: req.body.category,

@@ -285,6 +285,7 @@
           </div>
           <div class="contentBox">
             <h3><%= product.name %></h3>
+            <p class="MRP">₹<%= product.MRP %></p>
             <h2 class="price"><small>₹<%= product.price %></small></h2>
             <a href="/products/<%= product._id %>" class="buy"
               >Buy Now</a
@@ -522,6 +523,7 @@
             </div>
             <div class="contentBox">
               <h3><%= Products[i].name %></h3>
+               <p class="MRP">₹<%= Products[i].MRP %></p>
               <h2 class="price"><small>₹<%= Products[i].price %></small></h2>
               <a href="/products/<%= Products[i]._id %>" class="buy"
                 >Buy Now</a

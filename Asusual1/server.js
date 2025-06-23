@@ -217,6 +217,7 @@ app.use(async (req, res, next) => {
       }
 
       res.render("index", {
+        
         Products: shuffledProducts,
         posters,
         headings,

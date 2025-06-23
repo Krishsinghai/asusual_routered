@@ -23,7 +23,12 @@ body {
   color: var(--text-light);
   overflow-x: hidden;
 }
-
+.MRP {
+  text-decoration: line-through;
+  color: #aaa;
+  font-size: 1 rem;
+  margin-bottom: -8px;
+}
 /* Page 1 */
 .page1 {
   background-color: var(--background-light);
@@ -275,6 +280,7 @@ body {
 
   .card .contentBox h3 {
     font-size: 13px;
+            margin-top: 12px;
   }
 
   .card .contentBox .price {
@@ -371,6 +377,9 @@ body {
     display: none;
   }
   .blank-notification{
+    display: none;
+  }
+  .MRP{
     display: none;
   }
 }
